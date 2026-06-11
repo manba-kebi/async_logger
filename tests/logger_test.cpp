@@ -12,12 +12,14 @@ namespace {
 	std::string read_file(const std::filesystem::path& path) {
 		std::ifstream input(path, std::ios::binary);
 		std::ostringstream buffer;
-		buffer << input.rdbuf();
+		buffer << input.rdbuf();		//input.rdbuf() 获取 input 底层的文件缓冲区。
+		//把文件所有内容都读取出来，存到内存字符串 buffer 中。
 		return buffer.str();
 	}
 
+	//一次性 清空并重新创建测试日志目录
 	void reset_test_logs() {
-		std::filesystem::remove_all("test_logs");
+		std::filesystem::remove_all("test_logs");		//递归删除目录 test_logs 及其内部所有文件、子目录。
 		std::filesystem::create_directories("test_logs");
 	}
 }

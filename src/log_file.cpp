@@ -32,7 +32,7 @@ namespace asynclogger {
 	}
 
 	void LogFile::flush() {
-		if (stream_.is_opem()) {
+		if (stream_.is_open()) {
 			stream_.flush();
 		}
 	}

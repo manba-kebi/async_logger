@@ -44,7 +44,8 @@ namespace asynclogger {
 
 		std::mutex pending_mutex_;
 		std::condition_variable pending_cv_;
-		std::size_t pending_count_{ 0 };
+		std::size_t pending_count_{ 0 };	//它是已提交但尚未完成写入的日志消息数量。
+		//flush() 就利用它来判断是否所有待处理日志都已写完。
 
 		std::mutex file_mutex_;
 	public:

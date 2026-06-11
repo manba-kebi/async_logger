@@ -9,7 +9,7 @@ namespace asynclogger {
 	struct LogMessage {
 		LogLevel level{LogLevel::Info};					//日志级别
 		std::string text;								//日志文本
-		str::chrono::system_clock::time_point timestamp{ std::chrono::system_clock::now() };		//时间点
+		std::chrono::system_clock::time_point timestamp{ std::chrono::system_clock::now() };		//时间点
 		std::thread::id thread_id{ std::this_thread::get_id() };									//线程 id
 
 	};
