@@ -76,17 +76,22 @@ namespace asynclogger {
 	}
 
 	void AsyncLogger::stop() {
+		//原子设置停止标志，防止新的消息进入
 		const bool already_stopped = stopped_.exchange(true);
 		if (already_stopped) {
-			return ;
+			return ;		// 已经停止过了，避免重复关闭
 		}
 
+		//关闭队列：通常会让队列不再接受新 push，
+		//同时让阻塞在 pop() 上的消费者线程感知到关闭，退出循环
 		queue_.close();
 
+		//等待后台工作线程结束：它会继续消费完队列中剩余的所有消息
 		if (worker_.joinable()) {
 			worker_.join();
 		}
 
+		//最后再强制刷一次盘，保证所有已写入文件流的数据真正落到磁盘
 		std::lock_guard<std::mutex> lock(file_mutex_);
 		file_.flush();
 	}
