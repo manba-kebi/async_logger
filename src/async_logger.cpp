@@ -127,13 +127,18 @@ namespace asynclogger {
 
 	//正常处理完一条消息，完成计数。
 	void AsyncLogger::finish_one_message() {
+		bool all_finished = false;
 		{
-			std::lock_guard<std::mutex> lock(file_mutex_);
+			std::lock_guard<std::mutex> lock(pending_mutex_);
 			if (pending_count_ > 0) {
 				--pending_count_;
 			}
+			all_finished = pending_count_ == 0;
 		}
-		pending_cv_.notify_all();
+		if (all_finished) {
+			pending_cv_.notify_all();
+		}
+
 	}
 
 	//因为异常或丢弃而取消一条消息，取消计数。
