@@ -38,7 +38,7 @@ void test_multi_thread_push_pop() {
 
 	std::thread consumer([&] {
 		int value = 0;
-		whilie(queue.pop(value)) {
+		while(queue.pop(value)) {
 			++consumed;
 		}
 		});

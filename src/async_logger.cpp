@@ -96,7 +96,7 @@ namespace asynclogger {
 		file_.flush();
 	}
 
-	std::uint64_t AsyncLogger::deopped_count() const noexcept {
+	std::uint64_t AsyncLogger::dropped_count() const noexcept {
 		return dropped_count_.load();
 	}
 

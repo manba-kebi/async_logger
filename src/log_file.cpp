@@ -15,7 +15,7 @@ namespace asynclogger {
 	}
 
 	void LogFile::write(std::string_view line) {
-		open_if_need();					// 1) 确保流已经打开
+		open_if_needed();					// 1) 确保流已经打开
 		roll_if_needed(line.size());	// 2) 如果需要，滚动到新文件
 
 		stream_.write(line.data(), static_cast<std::streamsize>(line.size()));

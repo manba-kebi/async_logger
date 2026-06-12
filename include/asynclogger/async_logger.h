@@ -13,7 +13,6 @@
 #include "asynclogger/log_file.h"
 #include "asynclogger/log_message.h"
 
-using namespace std;
 
 namespace asynclogger {
 	enum class OverflowPolicy {
@@ -63,6 +62,6 @@ namespace asynclogger {
 		void flush();
 		void stop();
 
-		std::uint64_t deopped_count() const noexcept;
+		std::uint64_t dropped_count() const noexcept;
 	};
 }
