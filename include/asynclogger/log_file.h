@@ -1,13 +1,10 @@
 #pragma once
 
-#include <iostream>
 #include <fstream>
 #include <filesystem>	//文件系统库，包含 std::filesystem::path（表示文件路径）和 std::filesystem::create_directories 等函数，用于跨平台路径操作。
-#include <string>
+#include <cstddef>
 #include <string_view>
 #include <cstdint>		//提供固定宽度及最大宽度的整数类型，比如 std::uintmax_t（平台支持的最大无符号整数类型，通常用于表示文件大小等可能很大的尺寸）。
-#include <stdexcept>
-#include <utility>
 
 namespace asynclogger {
 	class LogFile {
@@ -23,8 +20,8 @@ namespace asynclogger {
 		std::filesystem::path base_path_;		// 原始传入的基础路径
 		std::filesystem::path current_path_;	// 当前实际写入文件的路径（随滚动改变）
 		std::ofstream stream_;					// 输出文件流对象
-		std::uintmax_t current_size_{ 0 };		// 滚动阈值（字节）
-		std::uintmax_t roll_size_bytes_{ 0 };	// 当前文件已写入字节数
+		std::uintmax_t current_size_{ 0 };		// 当前文件已经写入的字节数。
+		std::uintmax_t roll_size_bytes_{ 0 };	// 滚动阈值
 		std::size_t roll_index_{ 0 };			// 已滚动次数，也用作文件名后缀
 
 	public:

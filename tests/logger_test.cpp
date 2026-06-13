@@ -117,5 +117,9 @@ int main() {
 	test_multi_thread_logging();
 	test_drop_policy_does_not_block_forever();
 	test_log_rotation();
-	return 0;
+
+	int failures = 0;
+	failures += test::run("test name", test_function);
+	failures += test::run("another test", another_test_function);
+	return failures == 0 ? 0 : 1;
 }

@@ -1,5 +1,6 @@
+#pragma once
+
 #include "asynclogger/log_level.h"
-#include <iostream>
 #include <string>
 #include <chrono>
 #include <thread>

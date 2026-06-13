@@ -58,7 +58,8 @@ else()
 endif()
 
 if(ASYNCLOGGER_BUILD_EXAMPLES)
-	add_executable(async_logger_basic_usage examples/basic_usage.cpp)
+	add_executable(async_logger_basic_usage examples/basic_usage.cpp
+			tests/test_support.h)
 	target_link_libraries(
 			async_logger_basic_usage
 			PRIVATE

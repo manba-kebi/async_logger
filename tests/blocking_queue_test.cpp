@@ -67,5 +67,8 @@ int main() {
 	test_close_empty_pop();
 	test_multi_thread_push_pop();
 
-	return 0;
+	int failures = 0;
+	failures += test::run("test name", test_function);
+	failures += test::run("another test", another_test_function);
+	return failures == 0 ? 0 : 1;
 }
