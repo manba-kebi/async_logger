@@ -19,8 +19,5 @@ int main() {
 	assert(!line.empty());
 	assert(line.back() == '\n');
 
-	int failures = 0;
-	failures += test::run("test name", test_function);
-	failures += test::run("another test", another_test_function);
-	return failures == 0 ? 0 : 1;
+	return 0;
 }

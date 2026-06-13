@@ -18,7 +18,7 @@ function(add_asynclogger_test target_name)
     set_tests_properties(
             ${target_name}
             PROPERTIES
-            TIMEOUT 15
+                TIMEOUT 15
     )
 endfunction()
 
