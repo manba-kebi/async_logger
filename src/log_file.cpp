@@ -1,5 +1,9 @@
 #include "asynclogger/log_file.h"
 
+#include <stdexcept>
+#include <string>
+#include <utility>
+
 namespace asynclogger {
 	LogFile::LogFile(std::filesystem::path file_path, std::uintmax_t roll_size_bytes)
 		:base_path_(std::move(file_path)),

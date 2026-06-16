@@ -52,7 +52,7 @@ namespace test {
         //如果删除失败（比如目录不存在、权限不足），错误信息会写入 error，但函数不抛异常（因为我们用了带 error_code 的版本）。
         error.clear();
 
-        if (!std::filesystem::create_directory(path,error) && error) {
+        if (!std::filesystem::create_directories(path,error) && error) {
             //path：要创建的目录路径。
             //error：std::error_code& 输出参数，用来接收错误信息（如果创建失败）。
             //create_directory的返回值  返回 true：目录被成功创建了。

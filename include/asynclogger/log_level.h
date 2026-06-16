@@ -12,6 +12,6 @@ namespace asynclogger {
 		Error,
 	};
 
-	std::string_view to_string(LogLevel level) noexcept;	//°Ñ LogLevel ×ª³É×Ö·û´®
+	std::string_view to_string(LogLevel level) noexcept;	//æŠŠ LogLevel è½¬æˆå­—ç¬¦ä¸²
 
 }	
