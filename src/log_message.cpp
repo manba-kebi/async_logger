@@ -3,6 +3,8 @@
 #include <ctime>
 #include <iomanip>
 #include <sstream>
+#include <string>
+#include <string_view>
 
 namespace asynclogger {
     namespace {     // 匿名命名空间
@@ -24,6 +26,23 @@ namespace asynclogger {
         }
     }
 
+    std::string escape_line_breaks(std::string_view text) {
+        std::string escaped;
+        escaped.reserve(text.size());
+
+        for (const char character:text) {
+            if (character == '\n') {
+                escaped += "\\n";
+            }else if (character == '\r') {
+                escaped += "\\r";
+            }else {
+                escaped.push_back(character);
+            }
+        }
+
+        return escaped;
+    }
+
     std::string format_log_message(const LogMessage& message) {
         const auto seconds = std::chrono::time_point_cast<std::chrono::seconds>(message.timestamp);
         //message.timestamp 是一个 std::chrono::time_point，可能精度很高（微秒甚至纳秒）。
@@ -42,9 +61,9 @@ namespace asynclogger {
         << '.' <<std::setw(3)<<std::setfill('0')<<milliseconds.count()
         <<" ["<<to_string(message.level)<<"]"
         <<" [tid=" << thread_id.str()<<"] "
-        <<message.text
+        <<escape_line_breaks(message.text)
         <<'\n';
 
         return output.str();
     }
-}
+}   //namespace asynclogger
