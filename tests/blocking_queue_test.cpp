@@ -11,6 +11,7 @@ namespace {
 
 	using namespace std::chrono_literals;
 
+	//测试设置队列大小为 0 时，是否能正确的改为 1
 	void test_zero_capacity_becomes_one() {
 		asynclogger::BlockingQueue<int> queue(0);
 		test::require_equal(
@@ -20,6 +21,7 @@ namespace {
 		);
 	}
 
+	//测试该阻塞队列是否能正确的入队、出队元素（先进先出）
 	void test_fifo_push_and_pop() {
 		asynclogger::BlockingQueue<int> queue(3);
 
@@ -39,6 +41,7 @@ namespace {
 		test::require_equal(value,30,"queue must preserve FIFO order");
 	}
 
+	//测试 try_push 在队列满时放入元素是否能正确返回 false
 	void test_try_push_fails_when_full() {
 		asynclogger::BlockingQueue<int> queue(1);
 
@@ -55,6 +58,7 @@ namespace {
 		test::require(!queue.try_push(1),"try_push after close must fail");
 	}
 
+	//测试队列关闭后，能不能正确的排出元素，以及队列空之后排除元素能否返回 false
 	void test_close_drains_existing_items() {
 		asynclogger::BlockingQueue<int> queue(2);
 
@@ -73,6 +77,7 @@ namespace {
 		test::require(!queue.pop(value),"pop must return false after closed queue is drained");
 	}
 
+	//测试关闭队列后，唤醒消费者，消费者能否正常工作
 	void test_close_wakes_blocked_consumer() {
 		asynclogger::BlockingQueue<int> queue(1);
 		std::atomic<bool> pop_returned{false};
@@ -93,6 +98,7 @@ namespace {
 		test::require(!pop_result.load(),"consumer must receive false when closed queue is empty");
 	}
 
+	//测试队列满后，关闭队列，生产者放入元素能否返回 false
 	void test_close_wakes_blocked_producer() {
 		asynclogger::BlockingQueue<int> queue(1);
 		test::require(queue.push(1),"initial push must fill the queue");	//制造“满队列阻塞”的前提
@@ -116,6 +122,7 @@ namespace {
 		//在这个测试里，只要 push_result 变成了 false，就铁证如山地证明了 close() 成功唤醒了阻塞线程，并且线程正确地识别到了“关闭”状态。
 	}
 
+	//测试生产者与消费者能否正常生产日志放入队列，从队列中取出日志消费日志
 	void test_multiple_producers_do_not_lose_items() {
 		constexpr int kProducerCount = 4;
 		constexpr int kItemsPerProducer = 500;
@@ -154,7 +161,7 @@ namespace {
 		consumer.join();
 
 		test::require_equal(consumed_count.load(),kExpectedCount,"all produced items must be consumed");
-		test::require_equal(queue.size(),std::size_t{0},"queue must be empty adter consumer exits");
+		test::require_equal(queue.size(),std::size_t{0},"queue must be empty after consumer exits");
 
 	}
 
