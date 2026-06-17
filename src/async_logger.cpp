@@ -77,7 +77,7 @@ namespace asynclogger {
 
 	void AsyncLogger::stop() {
 		//原子设置停止标志，防止新的消息进入
-		const bool already_stopped = stopped_.exchange(true);
+		const bool already_stopped = stopped_.exchange(true);		//exchange(true)是原子操作	做两件事：第一是把stopped_设置为true	，第二是返回设置之前的旧值
 		if (already_stopped) {
 			return ;		// 已经停止过了，避免重复关闭
 		}

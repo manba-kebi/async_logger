@@ -1,122 +1,206 @@
 #include "asynclogger/async_logger.h"
 
-#include <cassert>
+#include <atomic>
+#include <cstdint>
+#include <cstddef>
 #include <filesystem>
-#include <fstream>
-#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
 
+#include "test_support.h"
+
 namespace {
-	std::string read_file(const std::filesystem::path& path) {
-		std::ifstream input(path, std::ios::binary);
-		std::ostringstream buffer;
-		buffer << input.rdbuf();		//input.rdbuf() 获取 input 底层的文件缓冲区。
-		//把文件所有内容都读取出来，存到内存字符串 buffer 中。
-		return buffer.str();
+
+	const std::filesystem::path kRoot = std::filesystem::path("test_output") / "async_logger";
+
+	asynclogger::LoggerConfig make_config(const std::filesystem::path& file_path) {
+		asynclogger::LoggerConfig config;
+		config.file_path = file_path;
+		config.max_queue_size = 64;
+		config.roll_size_bytes = 1024 * 1024;
+		config.overflow_policy = asynclogger::OverflowPolicy::Block;
+		config.auto_flush = false;
+		return config;
 	}
 
-	//一次性 清空并重新创建测试日志目录
-	void reset_test_logs() {
-		std::filesystem::remove_all("test_logs");		//递归删除目录 test_logs 及其内部所有文件、子目录。
-		std::filesystem::create_directories("test_logs");
+	//测试将三个不同日志等级的消息写入日志，能否正常写入
+	void test_basic_logging_and_flush() {
+		const auto directory = kRoot/"basic";
+		test::reset_directory(directory);
+
+		const auto path = directory / "app.log";
+		auto config = make_config(path);
+
+		asynclogger::AsyncLogger logger(config);
+
+		test::require(logger.info("hello info"),"info log must be accepted");
+		test::require(logger.warn("hello warn"),"warn log must be accepted");
+		test::require(logger.error("hello error"),"error log must be accepted");
+
+		logger.flush();
+
+		const std::string content = test::read_text_file(path);
+
+		test::require(content.find("[INFO]")!=std::string::npos,"INFO level must be written");
+		test::require(content.find("[WARN]")!=std::string::npos,"WARN level must be written");
+		test::require(content.find("[ERROR]")!=std::string::npos,"ERROR level must be written");
+		test::require(content.find("hello info") != std::string::npos,"info message must be written");
+		test::require(content.find("hello warn") != std::string::npos,"warn message must be written");
+		test::require(content.find("hello error") != std::string::npos,"error message must be written");
+		test::require_equal(test::count_lines(content),std::size_t{3},"three accepted messages must produce three lines");
+
+		logger.stop();
 	}
-}
 
-void test_basic_logging() {
-	reset_test_logs();
+	//测试在Block模式下， AsyncLogger类对象析构时，是否会将close前的所有的消息全都消费掉
+	void test_destructor_drains_pending_messages() {
+		const auto directory = kRoot/"destructor";
+		test::reset_directory(directory);
 
-	asynclogger::LoggerConfig config;
-	config.file_path = "test_logs/basic.log";
-	config.max_queue_size = 16;
-	config.roll_size_bytes = 1024 * 1024;
+		const auto path = directory / "app.log";
+		auto config = make_config(path);
 
-	asynclogger::AsyncLogger logger(config);
-	assert(logger.info("hello info"));
-	assert(logger.warn("hello warn"));
-	assert(logger.error("hello error"));
-	logger.stop();
-
-	const std::string content = read_file("test_logs/basic.log");
-	assert(content.find("hello info") != std::string::npos);
-	assert(content.find("hello warn") != std::string::npos);
-	assert(content.find("hello error") != std::string::npos);
-}
-
-void test_multi_thread_logging() {
-	reset_test_logs();
-
-	asynclogger::LoggerConfig config;
-	config.file_path = "test_logs/multi.log";
-	config.max_queue_size = 1024;
-	config.roll_size_bytes = 1024 * 1024;
-
-	asynclogger::AsyncLogger logger(config);
-
-	std::vector<std::thread> threads;
-	for (int i = 0; i < 4; i++) {
-		threads.emplace_back([i, &logger] {
-			for (int n = 0; n < 200; ++n) {
-				logger.info("thread-" + std::to_string(i) + "-message-" + std::to_string(n));
+		{
+			asynclogger::AsyncLogger logger(config);
+			for (int index = 0; index < 100; index++) {
+				test::require(logger.info("message-" + std::to_string(index)),"block mode log must be accepted");
 			}
+		}
+
+		const std::string content = test::read_text_file(path);
+		test::require_equal(test::count_lines(content),std::size_t{100},"destructor must drain all accepted messages");
+	}
+
+	//测试关闭 logger 前后记录日志，看关闭前能否正常记录日志，关闭后是否禁止记录日志
+	void test_stop_is_idempotent_and_rejects_new_logs() {
+		const auto directory = kRoot/"stop";
+		test::reset_directory(directory);
+
+		const auto path = directory / "app.log";
+		auto config = make_config(path);
+
+		asynclogger::AsyncLogger logger(config);
+		test::require(logger.info("before stop"),"pre-stop log must succeed");
+
+		logger.stop();
+		logger.stop();
+
+		test::require(!logger.info("after stop"),"logger must reject messages after stop");
+
+		const std::string content = test::read_text_file(path);
+		test::require(content.find("before stop")!=std::string::npos,"pre-stop message must be persisted");
+		test::require(content.find("after stop") == std::string::npos,"post-stop message must not be persisted");
+	}
+
+	//测试在阻塞模式下能否将多线程的生产的日志全都记录下来
+	void test_block_mode_preserves_all_multithreaded_logs() {
+		constexpr int kThreadCount = 4;				//constexpr 声明函数/变量能在编译期求值
+		constexpr int kMessagesPerThread = 200;
+		constexpr int kExpected = kThreadCount * kMessagesPerThread;
+
+		const auto directory = kRoot/"multithread";
+		test::reset_directory(directory);
+
+		const auto path = directory / "app.log";
+		auto config = make_config(path);
+		config.max_queue_size = 32;
+		config.overflow_policy = asynclogger::OverflowPolicy::Block;
+
+		asynclogger::AsyncLogger logger(config);
+		std::atomic<int> accepted_count{0};
+
+		std::vector<std::thread> producers;
+		producers.reserve(kThreadCount);
+
+		for (int thread_index = 0; thread_index < kThreadCount; thread_index++) {
+			producers.emplace_back([&,thread_index] {
+				for (int message_index = 0; message_index < kMessagesPerThread; message_index++) {
+					const std::string message = "thread-" + std::to_string(thread_index) + "-message-" +std::to_string(message_index);
+					if (logger.info(message)) {
+						accepted_count.fetch_add(1);
+					}
+				}
 			});
+		}
+
+		for (auto& producer : producers) {
+			producer.join();
+		}
+
+		logger.flush();
+		logger.stop();
+
+		test::require_equal(accepted_count.load(),kExpected,"Block mode must accept every message before stop");
+		test::require_equal(logger.dropped_count(),uint64_t{0},"Block mode must not drop messages in this test");
+
+		const std::string content = test::read_text_file(path);
+		test::require_equal(test::count_lines(content),static_cast<std::size_t>(kExpected),"file line conut must equal produced message count");
 	}
-	for (auto& thread : threads) {
-		thread.join();
+
+	//测试在Drop模式下，日志记录时，队列已满，是否真的会丢掉该日志
+	void test_drop_mode_accounting_is_consistent() {
+		constexpr int kAttemptCount = 5000;
+
+		const auto directory = kRoot/"drop";
+		test::reset_directory(directory);
+
+		const auto path  = directory / "app.log";
+		auto config = make_config(path);
+		config.max_queue_size = 1;
+		config.overflow_policy = asynclogger::OverflowPolicy::Drop;
+
+		asynclogger::AsyncLogger logger(config);
+		int accepted_count = 0;
+
+		for (int index = 0; index < kAttemptCount; index++) {
+			if (logger.info("drop-message-" + std::to_string(index))) {
+				++accepted_count;
+			}
+		}
+
+		logger.stop();
+
+		const auto dropped_count = logger.dropped_count();
+
+		test::require(accepted_count>0,"Drop mode must accept at least one message");
+		test::require_equal(static_cast<std::uint64_t>(kAttemptCount),static_cast<std::uint64_t>(accepted_count)+dropped_count,"accepted and dropped counts must cover all attempts");
+
+		const std::string content = test::read_text_file(path);
+		test::require_equal(test::count_lines(content),static_cast<std::uint64_t>(accepted_count),"persisted line count must equal accepted count");
 	}
 
-	logger.stop();
+	//测试写的字节数超过滚动阈值后，是否会生成新文件
+	void test_async_logger_triggers_rotation() {
+		const auto directory = kRoot/"rotation";
+		test::reset_directory(directory);
 
-	const std::string content = read_file("test_logs/multi.log");
-	assert(content.find("thread-0-message-0") != std::string::npos);
-	assert(content.find("thread-1-message-0") != std::string::npos);
-	assert(content.find("thread-2-message-0") != std::string::npos);
-	assert(content.find("thread-3-message-0") != std::string::npos);
-}
+		const auto path = directory / "app.log";
+		auto config = make_config(path);
+		config.roll_size_bytes = 256;
 
-void test_drop_policy_does_not_block_forever() {
-	reset_test_logs();
+		asynclogger::AsyncLogger logger(config);
 
-	asynclogger::LoggerConfig config;
-	config.file_path = "test_logs/drop.log";
-	config.max_queue_size = 1;
-	config.roll_size_bytes = 1024 * 1024;
-	config.overflow_policy = asynclogger::OverflowPolicy::Drop;
+		for (int index = 0;index<40;++index) {
+			test::require(logger.info("this is a long message used to trigger rotation" + std::to_string(index)),"rotation test log must be accepted");
+		}
 
-	asynclogger::AsyncLogger logger(config);
+		logger.stop();
 
-	for (int i = 0; i < 1000; i++) {
-		logger.info("drop-test-" + std::to_string(i));
+		test::require(std::filesystem::exists(path),"base log file must exist");
+		test::require(std::filesystem::exists(path.string()+".1"),"at least one rolled log file must exist");
 	}
-	
-	logger.stop();
-	assert(std::filesystem::exists("test_logs/drop.log"));
-}
-
-void test_log_rotation() {
-	reset_test_logs();
-
-	asynclogger::LoggerConfig config;
-	config.file_path = "test_logs/roll.log";
-	config.max_queue_size = 128;
-	config.roll_size_bytes = 256;
-
-	asynclogger::AsyncLogger logger(config);
-	for (int i = 0; i < 40; i++) {
-		logger.info("this is a long log line use to trigger file rolling " + std::to_string(i));
-	}
-	logger.stop();
-
-	assert(std::filesystem::exists("test_logs/roll.log"));
-	assert(std::filesystem::exists("test_logs/roll.log.1"));
-}
+}	//namespace
 
 int main() {
-	test_basic_logging();
-	test_multi_thread_logging();
-	test_drop_policy_does_not_block_forever();
-	test_log_rotation();
+	int failures = 0;
 
-	return 0;
+	failures += test::run("basic logging and flush",test_basic_logging_and_flush);
+	failures += test::run("destructor drains pending messages",test_destructor_drains_pending_messages);
+	failures += test::run("stop is idempotent and rejects new logs",test_stop_is_idempotent_and_rejects_new_logs);
+	failures += test::run("Block mode preservers multithreaded logs",test_block_mode_preserves_all_multithreaded_logs);
+	failures += test::run("Drop mode accounting is consistent",test_drop_mode_accounting_is_consistent);
+	failures += test::run("AsyncLogger triggers rotation",test_async_logger_triggers_rotation);
+
+	return failures == 0? 0:1;
 }
