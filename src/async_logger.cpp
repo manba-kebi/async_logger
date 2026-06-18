@@ -102,22 +102,40 @@ namespace asynclogger {
 
 	void AsyncLogger::worker_loop() {
 		LogMessage message;
-		while (queue_.pop(message)) {
-			const std::string line = format_log_message(message);
 
-			{
-				std::lock_guard<std::mutex> lock(file_mutex_);
-				file_.write(line);
-				if (config_.auto_flush) {
-					file_.flush();
+		while (queue_.pop(message)) {
+			bool persisted = false;
+
+			try {
+				const std::string line = format_log_message(message);
+
+				{
+					std::lock_guard<std::mutex> lock(file_mutex_);
+					file_.write(line);
+
+					if (config_.auto_flush) {
+						file_.flush();
+					}
 				}
+
+				persisted = true;
+			} catch (...) {
+				// Never allow an exception to escape the worker thread entry.
+			}
+
+			if (!persisted) {
+				dropped_count_.fetch_add(1);
 			}
 
 			finish_one_message();
 		}
 
-		std::lock_guard<std::mutex> lock(file_mutex_);
-		file_.flush();
+		try {
+			std::lock_guard<std::mutex> lock(file_mutex_);
+			file_.flush();
+		} catch (...) {
+			// stop() and destruction must not terminate the process because the final best-effort flush failed.
+		}
 	}
 
 	void AsyncLogger::increment_pending() {

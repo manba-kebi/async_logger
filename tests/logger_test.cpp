@@ -190,6 +190,24 @@ namespace {
 		test::require(std::filesystem::exists(path),"base log file must exist");
 		test::require(std::filesystem::exists(path.string()+".1"),"at least one rolled log file must exist");
 	}
+
+	void test_background_write_failure_is_counted() {
+		const auto directory = kRoot/"write_failure";
+		test::reset_directory(directory);
+
+		auto config = make_config(directory);		//这里把 `file_path` 设置成了一个已经存在的目录
+		config.max_queue_size = 8;
+
+		asynclogger::AsyncLogger logger(config);
+
+		test::require(logger.info("this write will fail"),"message should be accepted into the queue");
+		//`std::ofstream` 不能把目录当普通文件打开，所以后台写入会失败。
+
+		logger.flush();
+		logger.stop();
+
+		test::require_equal(logger.dropped_count(),std::uint64_t{1},"background write failure must be counted as dropped");
+	}
 }	//namespace
 
 int main() {
@@ -201,6 +219,7 @@ int main() {
 	failures += test::run("Block mode preservers multithreaded logs",test_block_mode_preserves_all_multithreaded_logs);
 	failures += test::run("Drop mode accounting is consistent",test_drop_mode_accounting_is_consistent);
 	failures += test::run("AsyncLogger triggers rotation",test_async_logger_triggers_rotation);
+	failures += test::run("background write failure is counted",test_background_write_failure_is_counted);
 
 	return failures == 0? 0:1;
 }
