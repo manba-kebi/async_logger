@@ -27,6 +27,12 @@ option(
 		${ASYNCLOGGER_IS_TOP_LEVEL}
 )
 
+option(
+		ASYNCLOGGER_BUILD_BENCHMARKS
+		"Build async_logger benchmarks"
+		OFF
+)
+
 find_package(Threads REQUIRED)
 
 add_library(asynclogger
@@ -64,6 +70,21 @@ if(ASYNCLOGGER_BUILD_EXAMPLES)
 			PRIVATE
 				asynclogger::asynclogger
 	)
+endif ()
+
+if(ASYNCLOGGER_BUILD_BENCHMARKS)
+	add_executable(benchmark_logger benchmarks/benchmark_logger.cpp)
+	target_link_libraries(
+			benchmark_logger
+			PRIVATE
+				asynclogger::asynclogger
+	)
+
+	if(MSVC)
+		target_compile_options(benchmark_logger PRIVATE /W4 /permissive-)
+	else()
+		target_compile_options(benchmark_logger PRIVATE -Wall -Wextra -Wpedantic)
+	endif ()
 endif ()
 
 if(ASYNCLOGGER_BUILD_TESTS)

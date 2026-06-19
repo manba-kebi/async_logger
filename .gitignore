@@ -40,3 +40,6 @@ Thumbs.db
 # Test output
 test_output/
 tests/test_output/
+
+# 不想提交的面试笔记
+/docs/interview_notes.md
