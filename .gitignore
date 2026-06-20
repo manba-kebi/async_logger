@@ -41,5 +41,8 @@ Thumbs.db
 test_output/
 tests/test_output/
 
-# 不想提交的面试笔记
+
 /docs/interview_notes.md
+
+# 忽略根目录下的 img 文件夹
+img/
