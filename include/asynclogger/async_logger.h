@@ -21,8 +21,8 @@ namespace asynclogger {
 	};
 	struct LoggerConfig {
 		std::filesystem::path file_path{"logs/app.log"};
-		size_t max_queue_size = 1024;
-		size_t roll_size_bytes = 10 * 1024 * 1024;
+		std::size_t max_queue_size = 1024;
+		std::size_t roll_size_bytes = 10 * 1024 * 1024;
 		OverflowPolicy overflow_policy{ OverflowPolicy::Block };
 		bool auto_flush{ false };
 	};
