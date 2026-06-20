@@ -194,7 +194,6 @@ benchmark 输出中的关键字段：
 
 - [docs/design_notes.md](docs/design_notes.md)：内部设计、线程模型、生命周期和关键不变量。
 - [docs/benchmark_notes.md](docs/benchmark_notes.md)：benchmark 构建命令、参数说明、字段解释和实验建议。
-- [docs/interview_notes.md](docs/interview_notes.md)：面试讲解提纲、常见追问和项目改进方向。
 
 ## 当前限制
 
